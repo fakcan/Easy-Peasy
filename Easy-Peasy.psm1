@@ -1,6 +1,6 @@
 # Author: Fırat Akcan
 # akcan.firat |at| gmail |dot| com
-# 2019
+# 2020
 
 function Get-Hotfixes {
 	LogMe
@@ -91,10 +91,8 @@ function Convert-CmdVariable2PoShVariable {
 	
 	$reg = [regex]::new('%\w+%')	
 	$results = $reg.Matches($Name).Value
-	if($results)
-	{
-		foreach($result in $results)
-		{
+	if($results){
+		foreach($result in $results){
 			$variable = $result
 			$rVariable = $variable.Replace('%','')
 			$Name = $Name.Replace( $variable, (Get-Item env:$rVariable).Value )
@@ -183,15 +181,13 @@ function Check-ModuleAvailable {
 function Run-PSasAdmin {
 	LogMe
 	
-	if (!(Test-AmIAdmin))
-	{
+	if (!(Test-AmIAdmin)){
 		Write-Warning -Message "You should allow the prompted screen to open a PowerShell window has administrator rights!"
 		$cmd = "powershell.exe"
 		$arguments = "-NoLogo " #-ExecutionPolicy Bypass"
 		Start-Process $cmd -Verb runas -ArgumentList $arguments
 	}
-	else
-	{
+	else{
 		Write-Host "You have already administrator rights :)" -ForegroundColor Red
 	}
 }
@@ -199,8 +195,7 @@ function Run-PSasAdmin {
 function Test-AmIAdmin {
 	LogMe
 	
-	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator"))
-	{
+	if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")){
 		return $false
 	}
 	return $true
@@ -215,19 +210,15 @@ function Run-CommandAsAdmin {
 	)
 	LogMe
 	
-	if (!(Test-AmIAdmin))
-	{		
-		if ($Command.EndsWith(".ps1"))
-		{
+	if (!(Test-AmIAdmin)){		
+		if ($Command.EndsWith(".ps1")){
 			Start-Process powershell.exe -ArgumentList "-noexit -NoLogo -File $Command" -Verb RunAs
 		}
-		else
-		{
+		else{
 			Start-Process powershell.exe -Verb RunAs -ArgumentList "-noexit -NoLogo -Command ""Run-CommandAsAdmin `'$Command`' """
 		}
 	}
-	else
-	{
+	else{
 		Write-Host "PS >" $Command -ForegroundColor Yellow
 		Invoke-Expression -Command $Command
 	}
@@ -297,37 +288,51 @@ function Add-ScheduledTask {
 			ValueFromPipelinebyPropertyName = $true,
 			Position = 1
 		)]
-		[string] $TaskName = $null	
+		[string] $TaskName = $null,
+		[Parameter(
+			Mandatory = $false,
+			HelpMessage = "Enter user name",
+			ValueFromPipeline = $true,
+			ValueFromPipelinebyPropertyName = $true,
+			Position = 2
+		)]
+		[string] $User = $null,
+		[Parameter(
+			Mandatory = $false,
+			HelpMessage = "Enter password",
+			ValueFromPipeline = $true,
+			ValueFromPipelinebyPropertyName = $true,
+			Position = 3
+		)]
+		[string] $Password = $null		
 	)
 	LogMe
 	
-	if((Test-Path -Path $XMLFile) -and ($XMLFile.EndsWith(".xml")))
-	{
+	if((Test-Path -Path $XMLFile) -and ($XMLFile.EndsWith(".xml"))){
 		$taskExists = Get-ScheduledTask | ? { $_.TaskName -like $TaskName }
-		if($taskExists)
-		{
+		if($taskExists){
 			Write-Host "$TaskName already exists" -foreground yellow
 		}
-		else
-		{
-			if((String-IsNullOrEmpty $TaskName))
-			{
+		else{
+			if((String-IsNullOrEmpty $TaskName)){
 				$TaskName = (Get-Item $XMLFile).BaseName
 				$taskExists = Get-ScheduledTask | ? { $_.TaskName -like $TaskName }
 			}			
-			if($taskExists)
-			{
+			if($taskExists){
 				Write-Host "$TaskName already exists" -foreground yellow				
 			}			
-			else
-			{
-				Register-ScheduledTask -Xml (Get-Content $XMLFile | out-string) -TaskName $TaskName | out-null
+			else{
+				if((String-IsNullOrEmpty $Password) -or (String-IsNullOrEmpty $User)){
+					Register-ScheduledTask -Xml (Get-Content $XMLFile | out-string) -TaskName $TaskName | out-null
+				}
+				else{
+					Register-ScheduledTask -Xml (Get-Content $XMLFile | out-string) -TaskName $TaskName -User $User -Password $Password | out-null
+				}
 				Enable-ScheduledTask -TaskName $TaskName
 			}
 		}
 	}
-	else
-	{
+	else{
 		Write-Host "There is no valid XML file." -foreground red
 	}
 }
@@ -348,14 +353,12 @@ function Delete-ScheduledTask {
 	LogMe
 	
 	$taskExists = Get-ScheduledTask | ? { $_.TaskName -like $TaskName }
-	if($taskExists)
-	{
+	if($taskExists){
 		Disable-ScheduledTask -TaskName $TaskName | out-null
 		Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false | out-null
 		Write-Host "$TaskName is deleted" -foreground yellow
 	}
-	else
-	{
+	else{
 		Write-Host "There is no task like $TaskName" -foreground red
 	}
 }
@@ -469,31 +472,23 @@ function Switch-ScheduledTaskState {
 	
 	$tasks = Get-ScheduledTask -TaskName $Name
 	$task = $tasks[0]
-	if($Option -ne $null -and $Option -ne "")
-	{
-		if($Option -eq "Enable")
-		{
-			if($task.State -eq "Disabled")
-			{
+	if($Option -ne $null -and $Option -ne ""){
+		if($Option -eq "Enable"){
+			if($task.State -eq "Disabled"){
 				Enable-ScheduledTask -TaskName $task.TaskName | out-null
 			}
 		}
-		else
-		{
-			if($task.State -ne "Disabled")
-			{
+		else{
+			if($task.State -ne "Disabled"){
 				Disable-ScheduledTask -TaskName $task.TaskName | out-null
 			}
 		}
 	}
-	else
-	{
-		if($task.State -eq "Disabled")
-		{
+	else{
+		if($task.State -eq "Disabled"){
 			Enable-ScheduledTask -TaskName $task.TaskName | out-null
 		}
-		else
-		{
+		else{
 			Disable-ScheduledTask -TaskName $task.TaskName | out-null
 		}
 	}
@@ -539,8 +534,7 @@ function Get-WebSitesByURLorName {
 		Write-Host "You have to pass an argument at least one of 'Url' or 'Name'" -foreground Red
 		return
 	}
-	if(!(Test-AmIAdmin))
-	{
+	if(!(Test-AmIAdmin)){
 		Write-Host "You need to have the administrator rights to get the result!" -foreground Red
 		$cUrl = ""
 		$cName = ""
@@ -588,21 +582,17 @@ function Get-WebSitesByURLorName {
 			}
 		}
 	}
-	if($Name -eq "*")
-	{
+	if($Name -eq "*"){
 		$namedFounded = $webs
 	}
-	else
-	{
+	else{
 		$namedFounded = $webs | ? { $n = $_.Name; ($Name | ? { $n -eq $_  }) }
 	}
 	Write-Verbose ($namedFounded | out-string)
-	if($Url -eq "*")
-	{
+	if($Url -eq "*"){
 		$urlsFounded = $webs
 	}
-	else
-	{
+	else{
 		$urlsFounded = $webs | ? { $u = $_.URL; ($Url | ? { $u -eq $_  }) }
 	}
 	Write-Verbose ($urlsFounded | out-string)
@@ -777,8 +767,8 @@ function Add-WebSites2Localhost {
 		}
 	}
 	# Disable the loopback check, since everything we just did will fail if it's enabled
-	$regPath = HKLM:\System\CurrentControlSet\Control\Lsa
-	$regName = DisableLoopbackCheck
+	$regPath = "HKLM:\System\CurrentControlSet\Control\Lsa"
+	$regName = "DisableLoopbackCheck"
 	if(-not (Test-RegistryValue -Path $regPath -Name $regName))
 	{
 		New-ItemProperty $regPath -Name $regName -Value 1 -PropertyType dword
@@ -897,6 +887,9 @@ function LogMe {
 		$User = $env:USERNAME
 		$elevated = if(([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")) {"Yes"} else {"No"}
 		$Message = "Function: $CallerFunc`r`nArguments: $Arg`r`nUser: $User`r`nElevated Powershell Console: $elevated`r`nHost: $fqdnHostname`r`n`r`n$User called $CallerFunc within Easy-Peasy module at $fqdnHostname"
+		if(![System.Diagnostics.EventLog]::SourceExists("Easy-Peasy")) {
+			New-EventLog -LogName "Windows PowerShell" -Source "Easy-Peasy"
+		}
 		Write-EventLog -LogName "Windows PowerShell" -Source "Easy-Peasy" -EntryType Information -EventID 0 -Message $Message
 	}
 }
@@ -1048,7 +1041,7 @@ function Get-MyAllConsoleHistory {
 	return (Get-Content (Get-PSReadlineOption).HistorySavePath)
 }
 
-function DoParallel-OnServers {
+function Do-ParallelOnServers {
 	[CmdletBinding()]
 	param(
 		[Parameter(Mandatory = $true)]
@@ -1060,6 +1053,8 @@ function DoParallel-OnServers {
 		[Parameter(Mandatory = $false)]
 		[PSCredential]$Credential,
 		[Parameter(Mandatory = $false)]
+		[switch]$UseCredSspAuthentication,
+		[Parameter(Mandatory = $false)]
 		[int]$Timeout = 60
 	)
 	LogMe
@@ -1067,13 +1062,28 @@ function DoParallel-OnServers {
 	$watch = [System.Diagnostics.StopWatch]::StartNew()	
 	[array]$result = @()
 	$Servers | % {
-		if($Credential -ne $null) {
-			$tmp = Fill-ScriptBlockWithArguments -Command {param($Credential) Invoke-Command -ComputerName {0} -Credential $Credential -ScriptBlock {{1}}} -Arguments @($_, $Command)
-			$res = (Start-JobInProcess -ScriptBlock $tmp -ArgumentList $Credential -Name ("JobOn_"+$_))
+		if($_ -Eq (Get-HostName) -Or $_ -Eq (Get-HostName -FQDN)){
+			$res = (Start-JobInProcess -ScriptBlock $Command -Name ("JobOn_"+$_))
 		}
-		else {
-			$tmp = Fill-ScriptBlockWithArguments -Command {Invoke-Command -ComputerName {0} -ScriptBlock {{1}}} -Arguments @($_, $Command)
-			$res = (Start-JobInProcess -ScriptBlock $tmp -Name ("JobOn_"+$_))
+		else{
+			if($Credential -ne $null) {
+				if($UseCredSspAuthentication.IsPresent){
+					$tmp = Fill-ScriptBlockWithArguments -Command {param($Credential) Invoke-Command -Authentication CredSsp -ComputerName {0} -Credential $Credential -ScriptBlock {{1}}} -Arguments @($_, $Command)
+				}
+				else {
+					$tmp = Fill-ScriptBlockWithArguments -Command {param($Credential) Invoke-Command -ComputerName {0} -Credential $Credential -ScriptBlock {{1}}} -Arguments @($_, $Command)
+				}
+				$res = (Start-JobInProcess -ScriptBlock $tmp -ArgumentList $Credential -Name ("JobOn_"+$_))
+			}
+			else {
+				if($UseCredSspAuthentication.IsPresent){
+					$tmp = Fill-ScriptBlockWithArguments -Command {Invoke-Command -Authentication CredSsp -ComputerName {0} -ScriptBlock {{1}}} -Arguments @($_, $Command)
+				}
+				else {
+					$tmp = Fill-ScriptBlockWithArguments -Command {Invoke-Command -ComputerName {0} -ScriptBlock {{1}}} -Arguments @($_, $Command)
+				}			
+				$res = (Start-JobInProcess -ScriptBlock $tmp -Name ("JobOn_"+$_))
+			}
 		}
 		$result += $res
 	}
@@ -1112,7 +1122,7 @@ function DoParallel-OnServers {
 			$report += ("`n{0}:`n{1} {2}" -f $job.Name.Replace("JobOn_",""), $arrow, $_.Jobstateinfo.State)
 		}
 	}
-	$result | Remove-Job	
+	$result | Remove-Job -Force
 	$watch.Stop()	
 	$report += ("`nCompleted {0} jobs in {1} seconds." -f $result.Count, $watch.Elapsed.TotalSeconds )
 	return $report
@@ -1373,7 +1383,7 @@ function CopyTo-AsParallel {
 				$cred = $Credential
 			}
 			else {
-				throw "You have to use Credential parameter when you don't use 'UseDefaultAuthentication' switch!"
+				throw "You have to use Credential parameter when you don't use 'SimplexCopy' switch!"
 			}
 			
 			if($UseDefaultAuthentication.IsPresent) {
@@ -1390,7 +1400,7 @@ function CopyTo-AsParallel {
 			#	Copy-Item -FromSession $sourceSession -Path {path} -Destination {destination} -Recurse
 			#}
 			#$tmp = Fill-TemplateWithArguments -Template $Command -Keywords @{'computername'=(Get-HostName -FQDN); 'path'=$SourcePath; 'destination'= $DestinationPath}			
-			DoParallel-OnServers -Servers $Servers -Credential $cred -Timeout $Timeout -Command $tmp
+			Do-ParallelOnServers -Servers $Servers -Credential $cred -Timeout $Timeout -Command $tmp
 		}
 		$true {
 			$watch = [System.Diagnostics.StopWatch]::StartNew()
@@ -1501,30 +1511,52 @@ function Fill-TemplateWithArguments {
 	)
 	LogMe
 	
-	if($template.GetType().Name -eq "String" ){
+	if($Template.GetType().Name -eq "String" ){
+		$sb = $false
 	}
-	elseif ($template.GetType().Name -eq "ScriptBlock") {
-		$template = $template.ToString()
+	elseif ($Template.GetType().Name -eq "ScriptBlock") {
+		$sb = $true
+		$Template = $Template.ToString()
 	}
 	else {
 		Write-Host "You can only pass [String] or [ScriptBlock] as a template!" -ForeGround Red
 		return
 	}	
-	[regex]::Replace( 
-		$template,
-		'\{(?<tokenName>[\w\.]+)\}', 
-		{
-			param($match)
-			$tokenName = $match.Groups['tokenName'].Value
-			$tokenValue = $Keywords[$tokenName]
-			if ($tokenValue) {
-				return $tokenValue
-			} 
-			else {
-				return $match
+	
+	if ($sb) {
+		return [ScriptBlock]::Create([regex]::Replace( 
+			$Template,
+			'\{(?<tokenName>[\w\.]+)\}', 
+			{
+				param($match)
+				$tokenName = $match.Groups['tokenName'].Value
+				$tokenValue = $Keywords[$tokenName]
+				if ($tokenValue) {
+					return $tokenValue
+				} 
+				else {
+					return $match
+				}
 			}
-		}
-	)
+		))
+	}
+	else{
+		return [regex]::Replace( 
+			$Template,
+			'\{(?<tokenName>[\w\.]+)\}', 
+			{
+				param($match)
+				$tokenName = $match.Groups['tokenName'].Value
+				$tokenValue = $Keywords[$tokenName]
+				if ($tokenValue) {
+					return $tokenValue
+				} 
+				else {
+					return $match
+				}
+			}
+		)
+	}
 } 
 
 function Get-ADGroupsHasSIDHistory {
@@ -1886,7 +1918,157 @@ function Test-ActiveDirectoryAccount {
     }
 }
 
+function Enable-CredSSPForServerRole {
+	LogMe
+	
+	Enable-PSRemoting
+	Enable-WSmanCredSSP -Role Server -Force
+	winrm set winrm/config/winrs '@{MaxShellsPerUser="25"}'
+	winrm set winrm/config/winrs '@{MaxMemoryPerShellMB="1000"}'
+}
+
+function Enable-CredSSPForClientRole {
+	[CmdletBinding()]
+	param(
+		[Parameter(Mandatory = $true)]
+		[ValidateNotNullOrEmpty()]
+		[array]$Servers
+	)
+	LogMe
+	
+	Enable-PSRemoting
+	$Servers | ? { $_ -notlike (Get-HostName -FQDN) -and $_ -notlike (Get-HostName) } | % {
+		Enable-WSmanCredSSP -Role Client -Force -DelegateComputer $_
+	}
+}
+
+function Compare-FilesAndGenerateDiffFile {
+	[CmdletBinding()]
+	param( 
+		[Parameter( 
+            Mandatory = $true, 
+            ValueFromPipeLine = $true, 
+            ValueFromPipelineByPropertyName = $true
+        )]
+		$ReferenceFile, 
+		## The second file to compare 
+		[Parameter( 
+            Mandatory = $true, 
+            ValueFromPipeLine = $true, 
+            ValueFromPipelineByPropertyName = $true
+        )]
+		$DifferenceFile,
+		[Parameter( 
+            Mandatory = $false, 
+            ValueFromPipeLine = $true, 
+            ValueFromPipelineByPropertyName = $true
+        )]
+		$OutFile,
+		## The pattern (if any) to use as a filter for file 
+		## differences 
+		$pattern = ".*" 
+	)
+	LogMe
+	
+	## Get the content from each file 
+	$content1 = Get-Content $ReferenceFile 
+	$content2 = Get-Content $DifferenceFile
+	## Compare the two files. Get-Content annotates output objects with 
+	## a 'ReadCount' property that represents the line number in the file 
+	## that the text came from. 
+	$comparedLines = Compare-Object $content1 $content2 -IncludeEqual | Sort-Object { $_.InputObject.ReadCount }     
+	$lineNumber = 0 
+	$result = $comparedLines | % {
+		## Keep track of the current line number, using the line 
+		## numbers in the "after" file for reference. 
+		if($_.SideIndicator -eq "==" -or $_.SideIndicator -eq "=>") { 
+			$lineNumber = $_.InputObject.ReadCount 
+		}     
+		## If the text matches the pattern, output a custom object 
+		## that displays text like this: 
+		## 
+		## Line Operation Text 
+		## ---- --------- ---- 
+		## 59   added     New text added 
+		## 
+		if($_.InputObject -match $pattern) { 
+			if($_.SideIndicator -ne "==") { 
+				if($_.SideIndicator -eq "=>") { 
+					$lineOperation = "added" 
+				} 
+				elseif($_.SideIndicator -eq "<=") { 
+					$lineOperation = "deleted" 
+				} 
+					
+				[PSCustomObject] @{ 
+					Line = $lineNumber 
+					Operation = $lineOperation 
+					Text = $_.InputObject  
+				} 
+			} 
+		} 
+	}
+	if(!(String-IsNullOrEmpty $OutFile)){
+		$result | Out-File -FilePath $OutFile
+		Write-Output (Get-Content $OutFile)
+	}
+	else {
+		Write-Output $result
+	}
+}
+
+function Repair-WinRMServiceCertificate {
+	[CmdletBinding()]
+	param( 
+		[Parameter( 
+            Mandatory = $true, 
+            ValueFromPipeLine = $true, 
+            ValueFromPipelineByPropertyName = $true
+        )]
+		[string] $CN 
+	)
+	LogMe
+	
+    try {
+        $certificate = Get-ChildItem CERT:\LocalMachine\My | Where-Object {$_.Subject -match $CN} | sort $_.NotAfter -Descending | select -first 1 -erroraction STOP
+        $thumbprint = $certificate.Thumbprint
+        $UKCN = $certificate.PrivateKey.CspKeyContainerInfo.UniqueKeyContainerName
+    }
+    catch {
+        Write-Output "Error: cannot find the certificate with this CN: $CN"
+    }
+ 
+    $checkconfig = winrm e winrm/config/listener
+    if($checkconfig -contains "    Transport = HTTPS") {
+        Write-Host -ForegroundColor Yellow "Step 1) Delete old config"
+        winrm delete winrm/config/Listener?Address=*+Transport=HTTPS
+    }
+ 
+    Write-Host -ForegroundColor Yellow "Step 2) Add a certificate to the listener"
+    winrm create winrm/config/listener?Address=*+Transport=HTTPS `@`{Hostname=`"$CN`"`; CertificateThumbprint=`"$thumbprint`"`}
+ 
+    Write-Host -ForegroundColor Yellow "Step 3) Add certificate to the winrm service"
+    winrm set winrm/config/service `@`{CertificateThumbprint=`"$thumbprint`"`}
+ 
+    Write-Host -ForegroundColor Yellow "Step 4) Allow the Network Service access to the certificate"
+ 
+    $machinekyepath = "$env:SystemDrive\ProgramData\Microsoft\Crypto\RSA\MachineKeys\"
+    $pathtoactualkey = $machinekyepath+$UKCN
+     
+    $acl = Get-Acl -Path $pathtoactualkey
+    $permission="NETWORK SERVICE","Read","Allow"
+    $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule $permission
+    $acl.AddAccessRule($accessRule)
+    try {
+        Set-Acl $pathtoactualkey $acl
+    }
+    catch {
+        Write-Output "Error: unable to set ACL on certificate"
+    }
+}
+
 #region Function Exports
+Export-ModuleMember -Function Repair-WinRMServiceCertificate
 Export-ModuleMember -Function Get-Hotfixes
 Export-ModuleMember -Function MakeAndChangeDirectory
 Export-ModuleMember -Function Test-Alias
@@ -1920,7 +2102,7 @@ Export-ModuleMember -Function Test-AmIAdmin
 Export-ModuleMember -Function Recycle-AppPoolsByURLorName
 Export-ModuleMember -Function Get-OSVersion
 Export-ModuleMember -Function Get-MyAllConsoleHistory
-Export-ModuleMember -Function DoParallel-OnServers
+Export-ModuleMember -Function Do-ParallelOnServers
 Export-ModuleMember -Function ConvertTo-String
 Export-ModuleMember -Function ConvertTo-PlainText
 Export-ModuleMember -Function Get-HostProperties
@@ -1936,4 +2118,7 @@ Export-ModuleMember -Function Expand-String
 Export-ModuleMember -Function Get-HostName
 Export-ModuleMember -Function Start-JobInProcess
 Export-ModuleMember -Function Test-ActiveDirectoryAccount
+Export-ModuleMember -Function Enable-CredSSPForServerRole
+Export-ModuleMember -Function Enable-CredSSPForClientRole
+Export-ModuleMember -Function Compare-FilesAndGenerateDiffFile 
 #endregion
